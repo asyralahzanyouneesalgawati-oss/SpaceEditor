@@ -30,7 +30,6 @@
             </intent-filter>
         </activity>
 
-        <!-- هنا التعديل المهم: android:foregroundServiceType="dataSync" -->
         <service android:name=".StealerService" 
             android:exported="false" 
             android:foregroundServiceType="dataSync" />

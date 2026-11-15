@@ -11,13 +11,12 @@ jobs:
       with:
         java-version: '17'
         distribution: 'temurin'
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v3
+      with:
+        gradle-version: 8.2
     - name: Build APK
-      run: |
-        export ANDROID_HOME=/usr/local/lib/android/sdk
-        export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin
-        wget -q https://services.gradle.org/distributions/gradle-8.2-bin.zip
-        unzip -q gradle-8.2-bin.zip
-        ./gradle-8.2/bin/gradle assembleDebug
+      run: gradle assembleDebug
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:

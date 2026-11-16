@@ -4,9 +4,6 @@ on: [push, workflow_dispatch]
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      ANDROID_HOME: /usr/local/lib/android/sdk
-      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
     steps:
     - uses: actions/checkout@v4
     
@@ -16,14 +13,12 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
         
-    - name: Setup Gradle
-      uses: gradle/actions/setup-gradle@v3
-      with:
-        gradle-version: 8.2
-        
     - name: Build APK
-      run: gradle assembleDebug
-      
+      run: |
+        export ANDROID_HOME=/usr/local/lib/android/sdk
+        echo "sdk.dir=$ANDROID_HOME" > local.properties
+        gradle assembleDebug --stacktrace
+        
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
